@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Browse Royal Caribbean Price</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f0f2f5;color:#333;padding:20px}
+.container{max-width:960px;margin:0 auto}
+h1{text-align:center;margin-bottom:20px;color:#1a237e;font-size:1.8em}
+.section{background:#fff;border-radius:8px;padding:20px;margin-bottom:16px;box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.section h2{font-size:1.2em;margin-bottom:12px;color:#1565c0;border-bottom:2px solid #e3f2fd;padding-bottom:6px}
+.section h3{font-size:1em;margin:10px 0 6px;color:#0d47a1}
+label{display:inline-block;margin-right:12px;font-weight:500}
+select,input{padding:6px 10px;border:1px solid #ccc;border-radius:4px;font-size:14px;margin-right:8px}
+button{padding:8px 16px;background:#1565c0;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:14px}
+button:hover{background:#0d47a1}
+button:disabled{background:#90caf9;cursor:not-allowed}
+.controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}
+select.dropdown{padding:6px 10px;border:1px solid #ccc;border-radius:4px;font-size:14px;min-width:300px;max-width:100%}
+input.searchbox{padding:6px 10px;border:1px solid #ccc;border-radius:4px;font-size:14px;width:200px}
+.price-row{padding:4px 0}
+.price-val{color:#2e7d32;font-weight:600}
+.product-item{padding:4px 0 4px 16px}
+.product-variant{padding:2px 0 2px 32px;color:#666;font-size:.9em}
+.activity-item{padding:6px 0;border-bottom:1px solid #f5f5f5}
+.menu-section{margin:8px 0}
+.menu-item{padding:2px 0 2px 16px}
+.loading{text-align:center;padding:20px;color:#666}
+.error{color:#c62828;padding:10px;background:#ffebee;border-radius:4px}
+.spinner{display:inline-block;width:20px;height:20px;border:3px solid #ccc;border-top-color:#1565c0;border-radius:50%;animation:spin .8s linear infinite;vertical-align:middle;margin-right:8px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.hidden{display:none}
+.link-box{background:#e8f5e9;padding:10px;border-radius:4px;word-break:break-all;margin:8px 0}
+.link-box a{color:#2e7d32}
+.day-label{font-weight:600;color:#1565c0}
+</style>
+</head>
+<body>
+<div class="container">
+<h1>Browse Royal Caribbean Price</h1>
+<div class="section">
+<h2>Options</h2>
+<div class="controls">
+<label>Currency:</label>
+<select id="currency"><option value="USD" selected>USD</option><option value="CAD">CAD</option><option value="GBP">GBP</option><option value="EUR">EUR</option><option value="AUD">AUD</option></select>
+<label>Sort Products:</label>
+<select id="sortkey"><option value="default">Default</option><option value="price">Price</option><option value="alpha">Alphabetical</option></select>
+<select id="sortorder"><option value="asc">Ascending</option><option value="desc">Descending</option></select>
+<label>Sort Activities:</label>
+<select id="activitysort"><option value="default">Default</option><option value="date">Date</option><option value="alpha">Alphabetical</option></select>
+<label><input type="checkbox" id="watchlistcodes"> Watchlist Codes</label>
+</div>
+</div>
+<div class="section">
+<h2>Select Ship & Sailing</h2>
+<div class="controls">
+<label>Ship:</label>
+<select id="shipDropdown" class="dropdown" onchange="onShipChange()">
+<option value="">-- Load Ships --</option>
+</select>
+<button onclick="loadShips()">Load</button>
+</div>
+<div class="controls">
+<label>Sailing:</label>
+<select id="sailingDropdown" class="dropdown" onchange="onSailingChange()">
+<option value="">-- Select a ship first --</option>
+</select>
+</div>
+<div id="shipLoading" class="loading hidden"><span class="spinner"></span>Loading ships...</div>
+<div id="sailingLoading" class="loading hidden"><span class="spinner"></span>Loading sailings...</div>
+<div id="shipError" class="error hidden"></div>
+<div id="sailingError" class="error hidden"></div>
+</div>
+<div class="section hidden" id="linkSection">
+<h2>Cruise Planner Link</h2>
+<div class="link-box" id="plannerLink"></div>
+</div>
+<div class="section hidden" id="priceSection">
+<h2>Cabin Prices</h2>
+<div id="priceLoading" class="loading hidden"><span class="spinner"></span>Loading prices...</div>
+<div id="priceData"></div>
+</div>
+<div class="section hidden" id="productsSection">
+<h2>Products</h2>
+<p style="color:#666;font-size:.9em;margin-bottom:8px">These are public prices; sale prices for you could be less.</p>
+<div id="productsLoading" class="loading hidden"><span class="spinner"></span>Gathering products (this may take a few minutes)...</div>
+<div id="productsData"></div>
+</div>
+<div class="section hidden" id="activitiesSection">
+<h2>Activities</h2>
+<div id="activitiesLoading" class="loading hidden"><span class="spinner"></span>Gathering activities (this may take a few minutes)...</div>
+<div id="activitiesData"></div>
+</div>
+<div class="section hidden" id="menusSection">
+<h2>Main Dining Room Menus</h2>
+<div id="menusLoading" class="loading hidden"><span class="spinner"></span>Gathering menus (this may take a few minutes)...</div>
+<div id="menusData"></div>
+</div>
+</div>
+<script>
+/* ===== API Keys (from original script) ===== */
+const appkeyWeb='hyNNqIPHHzaLzVpcICPdAdbFV8yvTsAm';
+const user_agent_web='Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:149.0) Gecko/20100101 Firefox/149.0';
+const appkeyMobileGraph='5pWJwSTvu30Dkw5GHLVQ5PsmoKRE1arh';
+const user_agent_mobile_graph='okhttp/4.12.0';
+
+let selectedShip=null, selectedSailing=null, portsData={}, allShips=[], allSailings=[];
+
+/* ===== Helpers ===== */
+function sanitize(s){
+  if(!s)return s;
+  s=s.replace(/\u00AE/g,'(R)').replace(/\u200B/g,' ').replace(/\u2013/g,'-').replace(/\u2014/g,'-')
+     .replace(/\u2018/g,'`').replace(/\u2019/g,"'").replace(/\u201C/g,'"').replace(/\u201D/g,'"').replace(/\u2120/g,'(SM)');
+  return s;
+}
+function fmtDate(ymd){
+  const d=new Date(ymd.substring(0,4),+ymd.substring(4,6)-1,ymd.substring(6,8));
+  return d.toLocaleDateString();
+}
+function daysBetween(sd,ad){
+  const d0=new Date(sd.substring(0,4),+sd.substring(4,6)-1,sd.substring(6,8));
+  const d1=new Date(ad.substring(0,4),+ad.substring(4,6)-1,ad.substring(6,8));
+  return Math.round((d1-d0)/864e5)+1;
+}
+
+/* ===== fetch helper ===== */
+async function apiGet(url,headers){
+  const r=await fetch(url,{headers});
+  return r.json();
+}
+async function apiPost(url,body,headers){
+  const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json',...headers},body:JSON.stringify(body)});
+  return r.json();
+}
+
+/* ===== SHIPS ===== */
+async function loadShips(){
+  const dd=document.getElementById('shipDropdown'),ld=document.getElementById('shipLoading'),err=document.getElementById('shipError');
+  ld.classList.remove('hidden');err.classList.add('hidden');
+  dd.disabled=true;dd.innerHTML='<option>Loading...</option>';
+  try{
+    const h={'Accept':'application/json',appkey:appkeyWeb,'User-Agent':user_agent_web};
+    const data=await apiGet('https://aws-prd.api.rccl.com/en/royal/web/v2/ships?sort=name',h);
+    const ships=data.payload.ships.map(s=>({code:s.shipCode,name:s.name}));
+    const hm=ships.find(s=>s.code==='HM');
+    if(hm)ships.push({code:'HE',name:'Hero of the Seas'});
+    allShips=ships;
+    dd.innerHTML='<option value="">-- Select Ship --</option>'+ships.map((s,i)=>`<option value="${i}">${s.name}</option>`).join('');
+    dd.disabled=false;
+  }catch(e){err.textContent='Error: '+e.message;err.classList.remove('hidden');dd.disabled=false;dd.innerHTML='<option value="">-- Load Ships --</option>';}
+  ld.classList.add('hidden');
+}
+function onShipChange(){
+  const i=+document.getElementById('shipDropdown').value;
+  if(!i&&!document.getElementById('shipDropdown').options[0].selected)return;
+  if(!i&&!document.getElementById('shipDropdown').options[0].selected){}
+  const idx=document.getElementById('shipDropdown').value;
+  if(!idx)return;
+  selectedShip=allShips[+idx];
+  allSailings=[];
+  document.getElementById('sailingDropdown').innerHTML='<option value="">Loading...</option>';
+  loadSailings();
+}
+async function loadSailings(){
+  const dd=document.getElementById('sailingDropdown'),ld=document.getElementById('sailingLoading'),err=document.getElementById('sailingError');
+  ld.classList.remove('hidden');err.classList.add('hidden');
+  try{
+    const h={'Accept':'application/json',appkey:appkeyWeb,'User-Agent':user_agent_web};
+    const data=await apiGet(`https://aws-prd.api.rccl.com/en/royal/web/v3/ships/${selectedShip.code}/voyages`,h);
+    const voyages=data.payload.voyages;
+    allSailings=voyages.map(v=>({date:v.sailDate,displayDate:fmtDate(v.sailDate),description:v.voyageDescription,duration:v.duration,voyageCode:v.voyageCode}));
+    dd.innerHTML='<option value="">-- Select Sailing --</option>'+allSailings.map((s,i)=>`<option value="${i}">${s.displayDate} — ${s.description}</option>`).join('');
+  }catch(e){err.textContent='Error: '+e.message;err.classList.remove('hidden');dd.innerHTML='<option value="">-- Select a ship first --</option>';}
+  ld.classList.add('hidden');
+}
+function onSailingChange(){
+  const idx=document.getElementById('sailingDropdown').value;
+  if(!idx)return;
+  runSailing(+idx);
+}
+
+/* ===== SELECT SAILING — loads everything ===== */
+async function runSailing(i){
+  selectedSailing=allSailings[i];
+  const isRoyal=selectedShip.name.includes('of the Seas');
+  const currency=document.getElementById('currency').value;
+  const sortkey=document.getElementById('sortkey').value;
+  const sortorder=document.getElementById('sortorder').value;
+  const activitysort=document.getElementById('activitysort').value;
+  const watchlistcodes=document.getElementById('watchlistcodes').checked;
+
+  ['linkSection','priceSection','productsSection','activitiesSection','menusSection'].forEach(id=>document.getElementById(id).classList.remove('hidden'));
+
+  /* Planner link */
+  const linkRoot=isRoyal?'https://www.royalcaribbean.com/account/cruise-planner/category/beverage':'https://www.celebritycruises.com/account/cruise-planner/category/drinks';
+  const linkUrl=`${linkRoot}?bookingId=123456&shipCode=${selectedShip.code}&sailDate=${selectedSailing.date}`;
+  document.getElementById('plannerLink').innerHTML=`<a href="${linkUrl}" target="_blank">${linkUrl}</a>`;
+
+  /* Ports */
+  try{
+    const h={'Accept':'application/json',appkey:appkeyWeb,'User-Agent':user_agent_web};
+    const data=await apiGet(`https://aws-prd.api.rccl.com/en/royal/web/v3/ships/${selectedShip.code}/sailDate/${selectedSailing.date}`,h);
+    const portInfo=data.payload.sailingInfo.itinerary.events;
+    portsData={};
+    portInfo.forEach(p=>{const pd=p.port;portsData[p.day]=sanitize(pd.portName);});
+  }catch(e){console.error('Ports error',e);}
+
+  loadPrice(currency);
+  loadProducts(currency,sortkey,sortorder,watchlistcodes);
+  loadActivities(activitysort);
+  loadMenus(isRoyal);
+}
+
+/* ===== CRUISE PRICE ===== */
+async function loadPrice(currency){
+  const ld=document.getElementById('priceLoading'),data=document.getElementById('priceData');
+  ld.classList.remove('hidden');data.innerHTML='';
+  const packageCode=selectedShip.code+selectedSailing.voyageCode;
+  const fsd=`${selectedSailing.date.substring(0,4)}-${selectedSailing.date.substring(4,6)}-${selectedSailing.date.substring(6,8)}`;
+  const filterStr=`id:${packageCode}|adults:2|children:0|startDate:${fsd}~${fsd}`;
+  try{
+    const h={'Accept':'*/*','Accept-Language':'en-US,en;q=0.9',currency};
+    const body={'operationName':'cruiseSearch_Cruises','variables':{'filters':filterStr,'qualifiers':'','enableNewCasinoExperience':false,'sort':{'by':'RECOMMENDED'},'pagination':{'count':100,'skip':0}},'query':'query cruiseSearch_Cruises($filters: String) {cruiseSearch(filters: $filters) {results {cruises {id sailings {sailDate stateroomClassPricing {price {value currency { code }} stateroomClass {id name content { code } }}}}}}}'};
+    const res=await apiPost('https://www.royalcaribbean.com/cruises/graph',body,h);
+    ld.classList.add('hidden');
+    const cruises=res.data.cruiseSearch.results.cruises;
+    if(!cruises.length){data.innerHTML='<p style="color:#c62828">Sailing is sold out</p>';return;}
+    const sailing=cruises[0].sailings.find(s=>s.sailDate.replace('-','')===selectedSailing.date||s.sailDate===selectedSailing.date);
+    if(!sailing){data.innerHTML='<p style="color:#c62828">Sailing is sold out</p>';return;}
+    let html='<h3>Cheapest available cabins:</h3>';
+    sailing.stateroomClassPricing.forEach(p=>{
+      const ct=p.stateroomClass.name;
+      if(!p.price)html+=`<div class="price-row">${ct} <em>sold out</em></div>`;
+      else{const pp=parseFloat(p.price.value)*2;html+=`<div class="price-row"><span class="price-val">${pp} ${currency}</span>: Cheapest ${ct} for 2</div>`;}
+    });
+    data.innerHTML=html;
+  }catch(e){ld.classList.add('hidden');data.innerHTML=`<div class="error">Error: ${e.message}</div>`;}
+}
+
+/* ===== PRODUCTS ===== */
+async function loadProducts(currency,sortkey,sortorder,showCodes){
+  const ld=document.getElementById('productsLoading'),data=document.getElementById('productsData');
+  ld.classList.remove('hidden');data.innerHTML='';
+  const h={'Accept':'application/json',appkey:appkeyWeb,'User-Agent':user_agent_web};
+  /* Get categories */
+  const catBody={'operationName':'WebCategories','variables':{'sailDate':selectedSailing.date,'shipCode':selectedShip.code},'query':'query WebCategories($shipCode: ShipCodeScalar!, $sailDate: LocalDateScalar!, $regionCode: String) { categories(shipCode: $shipCode, sailDate: $sailDate, regionCode: $regionCode, filter: {limitCategoriesWithProducts: true}) { ... on CategoryResultSuccess { categories { id name } } } }'};
+  let catRes;
+  try{catRes=await apiPost('https://aws-prd.api.rccl.com/en/royal/web/graphql',catBody,h);}catch(e){ld.classList.add('hidden');data.innerHTML=`<div class="error">Error: ${e.message}</div>`;return;}
+  const catArr=catRes.data?.categories?.categories||[];
+  if(!catArr.length){ld.classList.add('hidden');data.innerHTML='<p>No items for sale.</p>';return;}
+  let html='';
+  const apiSortKey=sortkey==='price'?'PRICE':sortkey==='alpha'?'TITLE':'RANK';
+  const apiSortOrder=sortorder==='desc'?'DESCENDING':'ASCENDING';
+  for(const cat of catArr){
+    html+=`<h3>${cat.name}</h3>`;
+    if(cat.id==='shorex'){
+      for(let day=1;day<=selectedSailing.duration+1;day++){
+        const prods=await fetchProducts(cat.id,day,apiSortKey,apiSortOrder,currency);
+        if(prods.length){
+          const pt=sanitize(portsData[day])||'';
+          html+=`<div class="day-label">Day ${day}: ${pt}</div>`;
+          html+=renderProductList(prods,cat.id,showCodes);
+        }
+      }
+    }else{
+      const prods=await fetchProducts(cat.id,'all',apiSortKey,apiSortOrder,currency);
+      html+=renderProductList(prods,cat.id,showCodes);
+    }
+    data.innerHTML=html;ld.style.display='none';
+  }
+  ld.classList.add('hidden');
+}
+async function fetchProducts(catId,dayNum,sortKey,sortOrder,currency){
+  const h={'Accept':'application/json',appkey:appkeyWeb,'User-Agent':user_agent_web};
+  const body={'operationName':'WebProductsByCategory','variables':{'category':catId,'passengerId':'','shipCode':selectedShip.code,'sailDate':selectedSailing.date,'reservationId':'000000','pageSize':12,'sorting':{'sortKey':sortKey,'sortKeyOrder':sortOrder},'filter':{'includeVariantProducts':false},'currencyCode':currency,'includeFilterInfo':false,'includeIfABexperience':false},'query':'query WebProductsByCategory($category:String!,$passengerId:String,$shipCode:ShipCodeScalar!,$sailDate:LocalDateScalar!,$reservationId:String,$pageSize:Long,$currentPage:Long,$sorting:Sorting,$filter:FilterInput,$currencyCode:String!){products(category:$category,guestTypes:[ADULT],passengerId:$passengerId,shipCode:$shipCode,sailDate:$sailDate,reservationId:$reservationId,pageSize:$pageSize,currentPage:$currentPage,sorting:$sorting,filter:$filter,currencyIso:$currencyCode){... on CommerceProductResultSuccess{commerceProducts{id title variantOptions{code name} price{currency promotionalPrice shipboardPrice formattedPromotionalPrice formattedBasePrice formattedDailyPrice formattedPromoDailyPrice salesUnit{code name label}}}}}}'};
+  if(dayNum!=='all')body.variables.filter.dayNumber=[dayNum];
+  const products=[];
+  for(let page=0;page<100;page++){
+    body.variables.currentPage=page;
+    let res;
+    try{res=await apiPost('https://aws-prd.api.rccl.com/en/royal/web/graphql',body,h);}catch(e){break;}
+    const tp=res.data?.products?.commerceProducts;
+    if(!tp)break;
+    products.push(...tp);
+  }
+  return processProducts(products,currency);
+}
+function processProducts(products,currency){
+  const result=[];
+  for(const p of products){
+    if(!p.price?.length)continue;
+    const ps=p.price[0];
+    const price=ps.formattedPromotionalPrice||ps.formattedBasePrice||ps.shipboardPrice;
+    if(!price)continue;
+    const clean=price.replace(/[^0-9.]/g,'').replace(/ /g,'');
+    if(parseFloat(clean)===0)continue;
+    const unit=ps.salesUnit?.name||'';
+    const variants=(p.variantOptions||[null]).slice(1).map(v=>({name:v.name?.includes('Bottles')?v.name+' (larger option)':v.name,code:v.code,price:'Price Not Available'}));
+    result.push({id:p.id,title:sanitize(p.title),price:clean,currency,unit,variants});
+  }
+  return result;
+}
+function renderProductList(products,key,showCodes){
+  if(!products.length)return'';
+  return products.map(p=>{
+    let u='';if(p.unit==='Per Night')u=' per night';if(p.unit==='Per Day')u=' per day';
+    const cs=showCodes?` <span style="color:#999;font-size:.85em">(prefix: ${key}, product: ${p.id})</span>`:'';
+    const vs=p.variants.map(v=>`<div class="product-variant">${v.name} - ${v.price}${showCodes?` (prefix: ${key}, product: ${v.code})`:''}</div>`).join('');
+    return`<div class="product-item">${p.title} <span class="price-val">${p.price} ${p.currency}</span>${u}${cs}</div>${vs}`;
+  }).join('');
+}
+
+/* ===== ACTIVITIES ===== */
+async function loadActivities(sortorder){
+  const ld=document.getElementById('activitiesLoading'),data=document.getElementById('activitiesData');
+  const h={'Accept':'application/json',appkey:appkeyWeb,'User-Agent':user_agent_web};
+  ld.classList.remove('hidden');data.innerHTML='';
+  const products=[];
+  try{
+    for(let offset=0;offset<10000;offset+=200){
+      const url=`https://aws-prd.api.rccl.com/en/royal/web/v3/products?sailingID=${selectedShip.code}${selectedSailing.date}&limit=200&offset=${offset}`;
+      const d=await apiGet(url,h);
+      if(!d?.payload)break;
+      for(const p of(d.payload.products||[])){
+        if(p.productType?.productType!=='NON_REVENUE_SCHEDULABLE')continue;
+        const loc=p.productLocation?.locationTitle||'';
+        for(const o of(p.offering||[])){
+          if(!o)continue;
+          products.push({productTitle:sanitize(p.productTitle),location:sanitize(loc),offeringDate:o.offeringDate,offeringTime:o.offeringTime,day:daysBetween(selectedSailing.date,o.offeringDate)});
+        }
+      }
+    }
+  }catch(e){ld.classList.add('hidden');data.innerHTML=`<div class="error">Error: ${e.message}</div>`;return;}
+  ld.classList.add('hidden');
+  if(!products.length){data.innerHTML='<p>No Activities Scheduled</p>';return;}
+  if(sortorder==='date')products.sort((a,b)=>a.offeringDate===b.offeringDate?a.offeringTime.localeCompare(b.offeringTime):a.offeringDate.localeCompare(b.offeringDate));
+  else if(sortorder==='alpha')products.sort((a,b)=>a.productTitle.localeCompare(b.productTitle));
+  data.innerHTML=products.map(a=>{
+    const fd=a.offeringDate;
+    const d=new Date(fd.substring(0,4),+fd.substring(4,6)-1,fd.substring(6,8));
+    const dateStr=d.toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'});
+    return`<div class="activity-item">${a.productTitle}<br><span style="color:#666">${a.location}</span> <span class="price-val">${dateStr} (Day ${a.day}) ${a.offeringTime}</span></div>`;
+  }).join('');
+}
+
+/* ===== MENUS ===== */
+async function loadMenus(isRoyal){
+  const ld=document.getElementById('menusLoading'),data=document.getElementById('menusData');
+  ld.classList.remove('hidden');data.innerHTML='';
+  const hg={'Accept':'application/json',appkey:appkeyMobileGraph,'User-Agent':user_agent_mobile_graph};
+  try{
+    /* Get MDR venue IDs */
+    const catBody={'operationName':'MobileAppPLPVenues','variables':{'category':isRoyal?'dining':'food','sailDate':selectedSailing.date,'shipCode':selectedShip.code,'reservationId':'','passengerId':'','guestTypes':['ADULT'],'filter':{'includeNonRevenueProducts':true,'subCategories':['dining_main','food_main']}},'query':'query MobileAppPLPVenues($category: String!, $sailDate: LocalDateScalar!, $shipCode: ShipCodeScalar!, $reservationId: String!, $passengerId: String!, $guestTypes: [GuestType!], $filter: ProductVenueFilterInput) { productsByVenueCategories(category: $category, shipCode: $shipCode, sailDate: $sailDate, passengerId: $passengerId, reservationId: $reservationId, filter: $filter, guestTypes: $guestTypes) { ... on VenueCategoryResultSuccess { venueCategories { venueSubCategories { venues { id title categoryIds } } } } ... on VenueCategoryExceptions { exceptions { ... on ProductsNotFound { exceptionType message } ... on VenueCategoryNotFound { exceptionType message } ... on VenuesNotFound { exceptionType message } } } } }'};
+    const catRes=await apiPost('https://api.rccl.com/en/royal/mobile/graphql',catBody,hg);
+    const vcs=catRes.data?.productsByVenueCategories?.venueCategories;
+    if(!vcs?.length){ld.classList.add('hidden');data.innerHTML='<p>Menus not yet populated; please check again later</p>';return;}
+    const venues=vcs[0]?.venueSubCategories?.[0]?.venues||[];
+    const venueIds=[];
+    for(const v of venues){
+      if(isRoyal){if(v.title.includes('Dining Room')&&!v.title.includes('My Time')){venueIds.push(v.id);break;}}
+      else venueIds.push(v.id);
+    }
+    if(!venueIds.length){ld.classList.add('hidden');data.innerHTML='<p>Menus not yet populated; please check again later</p>';return;}
+
+    /* Get menus */
+    const menuBody={'operationName':'MobileAppMenuDetails','variables':{'sailDate':selectedSailing.date,'shipCode':selectedShip.code,'filter':{'ids':venueIds}},'query':'query MobileAppMenuDetails($sailDate: LocalDateScalar!, $shipCode: ShipCodeScalar!, $filter: VenueFilterInput) { venues(sailDate: $sailDate, shipCode: $shipCode, filter: $filter) {  ... on VenueResultSuccess { venues { id menus { day timeOfDay name sections { menuItems { title } name } } title } } ... on VenueExceptions { exceptions {  ... on VenueNotFound {  message } } } } }'};
+    const menuRes=await apiPost('https://api.rccl.com/en/royal/mobile/graphql',menuBody,hg);
+    const mv=menuRes.data?.venues?.venues;
+    if(!mv?.length){ld.classList.add('hidden');data.innerHTML='<p>Menus not yet populated; please check again later</p>';return;}
+    let html='';
+    for(const venue of mv){
+      const menus=venue.menus||[];
+      if(!menus.length){ld.classList.add('hidden');data.innerHTML='<p>Menus not yet populated; please check again later</p>';return;}
+      for(const menu of menus){
+        const{day,timeOfDay,name}=menu;
+        if(name.includes('Beverage')||name.includes('Wine')||timeOfDay.includes('Wine'))continue;
+        const pt=sanitize(portsData[day])||'';
+        if(!pt)continue;
+        html+=`<div class="menu-section"><strong>Day ${day} ${timeOfDay} ${name}</strong> : ${pt}<br>`;
+        for(const sec of(menu.sections||[])){
+          const sn=sanitize(sec.name);
+          if(['Juices','Coffee','Specialty','Allergens','Beverage','Wine','Private'].some(x=>sn.includes(x)))continue;
+          html+=`<div style="color:#1565c0;font-weight:600;margin-top:6px">${sn}</div>`;
+          for(const mi of(sec.menuItems||[])){
+            const t=sanitize(mi.title);
+            if(['Safety','Recommendations',''].includes(t)||t===sn)continue;
+            html+=`<div class="menu-item">${t}</div>`;
+          }
+        }
+        html+='</div>';
+      }
+    }
+    ld.classList.add('hidden');
+    data.innerHTML=html||'<p>Menus not yet populated; please check again later</p>';
+  }catch(e){ld.classList.add('hidden');data.innerHTML=`<div class="error">Error: ${e.message}</div>`;}
+}
+</script>
+</body>
+</html>
